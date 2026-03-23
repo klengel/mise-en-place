@@ -1,0 +1,40 @@
+{
+  "name": "KitchenSettings",
+  "type": "object",
+  "properties": {
+    "kitchen_name": {
+      "type": "string"
+    },
+    "staff_count": {
+      "type": "number"
+    },
+    "prep_start_time": {
+      "type": "string"
+    },
+    "service_start_time": {
+      "type": "string"
+    },
+    "is_default": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "staff_count",
+    "prep_start_time",
+    "service_start_time"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}

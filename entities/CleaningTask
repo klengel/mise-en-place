@@ -1,0 +1,50 @@
+{
+  "name": "CleaningTask",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "frequency": {
+      "type": "string",
+      "enum": [
+        "daily",
+        "weekly"
+      ]
+    },
+    "day_of_week": {
+      "type": "string"
+    },
+    "time_of_day": {
+      "type": "string"
+    },
+    "completions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of ISO date strings when task was completed"
+    }
+  },
+  "required": [
+    "title",
+    "frequency"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}

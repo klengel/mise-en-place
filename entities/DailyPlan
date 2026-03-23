@@ -1,0 +1,55 @@
+{
+  "name": "DailyPlan",
+  "type": "object",
+  "properties": {
+    "plan_date": {
+      "type": "string"
+    },
+    "preset_name": {
+      "type": "string"
+    },
+    "dishes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "recipe_id": {
+            "type": "string"
+          },
+          "recipe_name": {
+            "type": "string"
+          },
+          "portions": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "schedule": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "settings_override": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "plan_date"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}

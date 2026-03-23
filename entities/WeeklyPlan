@@ -1,0 +1,33 @@
+{
+  "name": "WeeklyPlan",
+  "type": "object",
+  "properties": {
+    "week_start": {
+      "type": "string"
+    },
+    "preset_name": {
+      "type": "string"
+    },
+    "days": {
+      "type": "object",
+      "description": "Keys: mon, tue, wed, thu, fri, sat, sun. Values: arrays of {recipe_id, recipe_name, portions}"
+    }
+  },
+  "required": [
+    "week_start"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
