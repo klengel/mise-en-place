@@ -21,7 +21,6 @@ export default function RecipeForm({ recipe, labels = [], onClose, onSaved }) {
     ingredients: recipe?.ingredients || [{ name: '', quantity: '', unit: '' }],
     steps: recipe?.steps || [{ description: '', duration_minutes: '' }],
   });
-  const [saving, setSaving] = useState(false);
   const [estimatingStep, setEstimatingStep] = useState(null);
 
   function updateField(key, value) { setForm(prev => ({ ...prev, [key]: value })); }
@@ -45,18 +44,33 @@ export default function RecipeForm({ recipe, labels = [], onClose, onSaved }) {
 
   async function handleSave() {
     if (!form.name.trim()) return toast.error('Recipe name is required');
-    setSaving(true);
+
     const payload = {
       ...form,
       label_id: form.label_id || null,
       ingredients: form.ingredients.filter(i => i.name.trim()),
       steps: form.steps.filter(s => s.description.trim()).map(s => ({ ...s, duration_minutes: s.duration_minutes ? Number(s.duration_minutes) : null }))
     };
-    let saved;
-    if (recipe?.id) { saved = await db.entities.Recipe.update(recipe.id, payload); }
-    else { saved = await db.entities.Recipe.create(payload); }
-    setSaving(false);
-    onSaved(saved);
+
+    // Optimistic update — close immediately with a temporary record
+    const optimistic = {
+      ...payload,
+      id: recipe?.id || `temp_${Date.now()}`,
+      created_date: recipe?.created_date || new Date().toISOString(),
+      updated_date: new Date().toISOString(),
+    };
+    onSaved(optimistic);
+
+    // Save to Supabase in the background
+    try {
+      let saved;
+      if (recipe?.id) { saved = await db.entities.Recipe.update(recipe.id, payload); }
+      else { saved = await db.entities.Recipe.create(payload); }
+      // Replace the optimistic record with the real one (gets the proper UUID)
+      onSaved(saved);
+    } catch {
+      toast.error('Failed to save recipe. Please try again.');
+    }
   }
 
   return (
@@ -154,8 +168,7 @@ export default function RecipeForm({ recipe, labels = [], onClose, onSaved }) {
 
         <div className="flex justify-end gap-3 p-5 border-t border-border">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving} className="gap-2 min-w-[100px]">
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+          <Button onClick={handleSave} className="min-w-[100px]">
             {recipe ? 'Save Changes' : 'Create Recipe'}
           </Button>
         </div>
