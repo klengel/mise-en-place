@@ -1,7 +1,5 @@
 // Cloud database using Supabase
 // Replaces localStorage — data is now shared across all devices and users.
-// The API (list, filter, get, create, update, delete) is identical to the
-// old localStorage version so no page components need to change.
 
 import { supabase } from './supabaseClient';
 
@@ -18,9 +16,7 @@ function createEntity(tableName) {
         query = query.order('created_date', { ascending: false });
       }
 
-      if (limit) {
-        query = query.limit(limit);
-      }
+      if (limit) query = query.limit(limit);
 
       const { data, error } = await query;
       if (error) throw new Error(error.message);
@@ -48,31 +44,21 @@ function createEntity(tableName) {
     },
 
     async create(payload) {
-      const { data, error } = await supabase
-        .from(tableName)
-        .insert({ ...payload, created_date: new Date().toISOString(), updated_date: new Date().toISOString() })
-        .select()
-        .single();
+      const row = { ...payload, created_date: new Date().toISOString(), updated_date: new Date().toISOString() };
+      const { error } = await supabase.from(tableName).insert(row);
       if (error) throw new Error(error.message);
-      return data;
+      return row;
     },
 
     async update(id, payload) {
-      const { data, error } = await supabase
-        .from(tableName)
-        .update({ ...payload, updated_date: new Date().toISOString() })
-        .eq('id', id)
-        .select()
-        .single();
+      const row = { ...payload, updated_date: new Date().toISOString() };
+      const { error } = await supabase.from(tableName).update(row).eq('id', id);
       if (error) throw new Error(error.message);
-      return data;
+      return { ...row, id };
     },
 
     async delete(id) {
-      const { error } = await supabase
-        .from(tableName)
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from(tableName).delete().eq('id', id);
       if (error) throw new Error(error.message);
       return { id };
     },
