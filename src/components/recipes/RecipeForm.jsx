@@ -22,6 +22,7 @@ export default function RecipeForm({ recipe, labels = [], onClose, onSaved }) {
     steps: recipe?.steps || [{ description: '', duration_minutes: '' }],
   });
   const [estimatingStep, setEstimatingStep] = useState(null);
+  const [lastEstimate, setLastEstimate] = useState(0);
 
   function updateField(key, value) { setForm(prev => ({ ...prev, [key]: value })); }
   function updateIngredient(i, key, val) { updateField('ingredients', form.ingredients.map((ing, idx) => idx === i ? { ...ing, [key]: val } : ing)); }
@@ -32,13 +33,24 @@ export default function RecipeForm({ recipe, labels = [], onClose, onSaved }) {
   function removeStep(i) { updateField('steps', form.steps.filter((_, idx) => idx !== i)); }
 
   async function estimateTime(i) {
+    const secondsSinceLast = (Date.now() - lastEstimate) / 1000;
+    if (secondsSinceLast < 5) {
+      toast.error(`Wait ${Math.ceil(5 - secondsSinceLast)}s before estimating again.`);
+      return;
+    }
+    setLastEstimate(Date.now());
     if (!form.steps[i].description) return toast.error('Enter a step description first');
     setEstimatingStep(i);
     try {
       const result = await estimateStepTime(form.steps[i].description, form.name || 'Unknown dish');
       updateStep(i, 'duration_minutes', result.estimated_minutes);
       toast.success(`Estimated: ${result.estimated_minutes} min`);
-    } catch { toast.error('Could not estimate time. Check your Gemini API key.'); }
+    } catch (err) { 
+      const msg = err?.message?.includes('429') 
+        ? 'AI rate limit reached — wait a minute and try again.' 
+        : 'Could not estimate time. Check your Gemini API key.';
+      toast.error(msg);
+    }
     finally { setEstimatingStep(null); }
   }
 
