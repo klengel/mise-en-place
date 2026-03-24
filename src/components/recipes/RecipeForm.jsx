@@ -48,6 +48,7 @@ export default function RecipeForm({ recipe, labels = [], onClose, onSaved }) {
     const payload = {
       ...form,
       label_id: form.label_id || null,
+      base_portions: form.base_portions !== '' ? Number(form.base_portions) : null,
       ingredients: form.ingredients.filter(i => i.name.trim()),
       steps: form.steps.filter(s => s.description.trim()).map(s => ({ ...s, duration_minutes: s.duration_minutes ? Number(s.duration_minutes) : null }))
     };
