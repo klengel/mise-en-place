@@ -10,6 +10,8 @@ import WeeklyPlanning from './pages/WeeklyPlanning';
 import CleaningTasks from './pages/CleaningTasks';
 import Settings from './pages/Settings';
 import AuthPage from './pages/AuthPage';
+import HaccpPage from './pages/HaccpPage';
+import FilesPage from './pages/FilesPage';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 
 function AppRoutes() {
@@ -23,9 +25,7 @@ function AppRoutes() {
     );
   }
 
-  if (!user) {
-    return <AuthPage />;
-  }
+  if (!user) return <AuthPage />;
 
   return (
     <Routes>
@@ -34,6 +34,8 @@ function AppRoutes() {
         <Route path="/daily" element={<DailyPlanning />} />
         <Route path="/weekly" element={<WeeklyPlanning />} />
         <Route path="/cleaning" element={<CleaningTasks />} />
+        <Route path="/haccp" element={<HaccpPage />} />
+        <Route path="/files" element={<FilesPage />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />

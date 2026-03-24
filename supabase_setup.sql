@@ -146,3 +146,43 @@ create policy "Authenticated users can update labels"
   on labels for update to authenticated using (true);
 create policy "Authenticated users can delete labels"
   on labels for delete to authenticated using (true);
+
+-- =====================================================
+-- Additional tables for new features
+-- =====================================================
+
+-- SAVED FILES (plannings, HACCP)
+create table if not exists saved_files (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  type text not null check (type in ('daily', 'weekly', 'cleaning', 'haccp')),
+  content jsonb not null,
+  file_date text,
+  created_date timestamptz default now(),
+  updated_date timestamptz default now()
+);
+
+alter table saved_files enable row level security;
+create policy "Authenticated users can read saved_files" on saved_files for select to authenticated using (true);
+create policy "Authenticated users can insert saved_files" on saved_files for insert to authenticated with check (true);
+create policy "Authenticated users can update saved_files" on saved_files for update to authenticated using (true);
+create policy "Authenticated users can delete saved_files" on saved_files for delete to authenticated using (true);
+
+-- HACCP RECORDS
+create table if not exists haccp_records (
+  id uuid primary key default gen_random_uuid(),
+  year integer not null,
+  week_number integer not null,
+  data jsonb not null default '{}',
+  created_date timestamptz default now(),
+  updated_date timestamptz default now()
+);
+
+alter table haccp_records enable row level security;
+create policy "Authenticated users can read haccp_records" on haccp_records for select to authenticated using (true);
+create policy "Authenticated users can insert haccp_records" on haccp_records for insert to authenticated with check (true);
+create policy "Authenticated users can update haccp_records" on haccp_records for update to authenticated using (true);
+create policy "Authenticated users can delete haccp_records" on haccp_records for delete to authenticated using (true);
+
+-- Add photo_url to recipes
+alter table recipes add column if not exists photo_url text;

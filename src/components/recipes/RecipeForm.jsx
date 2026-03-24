@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
+import { supabase } from '@/lib/supabaseClient';
 import { useState } from 'react';
-import { X, Plus, Trash2, Loader2, Wand2 } from 'lucide-react';
+import { X, Plus, Trash2, Loader2, Wand2, Camera, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,9 +21,11 @@ export default function RecipeForm({ recipe, labels = [], onClose, onSaved }) {
     label_id: recipe?.label_id || '',
     ingredients: recipe?.ingredients || [{ name: '', quantity: '', unit: '' }],
     steps: recipe?.steps || [{ description: '', duration_minutes: '' }],
+    photo_url: recipe?.photo_url || '',
   });
   const [estimatingStep, setEstimatingStep] = useState(null);
   const [lastEstimate, setLastEstimate] = useState(0);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   function updateField(key, value) { setForm(prev => ({ ...prev, [key]: value })); }
   function updateIngredient(i, key, val) { updateField('ingredients', form.ingredients.map((ing, idx) => idx === i ? { ...ing, [key]: val } : ing)); }
@@ -52,6 +55,26 @@ export default function RecipeForm({ recipe, labels = [], onClose, onSaved }) {
       toast.error(msg);
     }
     finally { setEstimatingStep(null); }
+  }
+
+  async function handlePhotoUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) return toast.error('Photo must be under 5MB');
+    setUploadingPhoto(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `recipes/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('recipe-photos').upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data } = supabase.storage.from('recipe-photos').getPublicUrl(path);
+      updateField('photo_url', data.publicUrl);
+      toast.success('Photo uploaded!');
+    } catch {
+      toast.error('Photo upload failed. Make sure the recipe-photos storage bucket exists in Supabase.');
+    } finally {
+      setUploadingPhoto(false);
+    }
   }
 
   async function handleSave() {
@@ -96,6 +119,33 @@ export default function RecipeForm({ recipe, labels = [], onClose, onSaved }) {
 
         <div className="p-5 space-y-5">
           <div className="grid grid-cols-2 gap-4">
+            {/* Photo upload */}
+            <div className="col-span-2">
+              <label className="text-sm font-medium mb-1 block">Photo</label>
+              <div className="flex items-center gap-3">
+                {form.photo_url ? (
+                  <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-border shrink-0">
+                    <img src={form.photo_url} alt="Recipe" className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => updateField('photo_url', '')}
+                      className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center text-white">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-24 h-24 rounded-lg border-2 border-dashed border-border flex items-center justify-center shrink-0">
+                    <Camera className="w-6 h-6 text-muted-foreground/40" />
+                  </div>
+                )}
+                <label className="cursor-pointer">
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploadingPhoto} />
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border hover:bg-accent text-sm font-medium transition-colors">
+                    {uploadingPhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {uploadingPhoto ? 'Uploading...' : 'Upload photo'}
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <div className="col-span-2 sm:col-span-1">
               <label className="text-sm font-medium mb-1 block">Recipe Name *</label>
               <Input value={form.name} onChange={e => updateField('name', e.target.value)} placeholder="e.g. Braised Short Rib" />

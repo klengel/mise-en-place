@@ -76,13 +76,14 @@ export default function DailyPlanning() {
   function addDish(recipe) {
     setSelectedDishes(prev => {
       if (prev.find(d => d.recipe_id === recipe.id)) return prev;
-      return [...prev, { recipe_id: recipe.id, recipe_name: recipe.name, portions: 10, steps: recipe.steps, ingredients: recipe.ingredients, label_id: recipe.label_id }];
+      return [...prev, { recipe_id: recipe.id, recipe_name: recipe.name, portions: 10, steps: recipe.steps, ingredients: recipe.ingredients, label_id: recipe.label_id, deadline_time: '' }];
     });
     setShowRecipeSelector(false);
   }
 
   function removeDish(id) { setSelectedDishes(prev => prev.filter(d => d.recipe_id !== id)); }
   function updatePortions(id, val) { setSelectedDishes(prev => prev.map(d => d.recipe_id === id ? { ...d, portions: Number(val) } : d)); }
+  function updateDeadline(id, val) { setSelectedDishes(prev => prev.map(d => d.recipe_id === id ? { ...d, deadline_time: val } : d)); }
 
   function toggleCleaningTask(id) {
     setSelectedCleaningIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -94,10 +95,8 @@ export default function DailyPlanning() {
     try {
       const sched = await generateDailySchedule(selectedDishes, settings.staff_count, settings.prep_start_time, settings.service_start_time);
       const schedWithIds = sched.map((t, i) => ({ ...t, id: generateTaskId(t, i) }));
-
-      // Add MEP cleaning tasks inline
       const mepCleaningTasks = allCleaningTasks.filter(t => t.during_mep && selectedCleaningIds.includes(t.id));
-      const mepEntries = mepCleaningTasks.map((t, i) => ({
+      const mepEntries = mepCleaningTasks.map((t) => ({
         id: `cleaning-mep-${t.id}`,
         task: t.title,
         dish: 'Cleaning (MEP)',
@@ -109,12 +108,11 @@ export default function DailyPlanning() {
         is_cleaning: true,
         duration_minutes: t.duration_minutes || 10,
       }));
-
       setSchedule([...schedWithIds, ...mepEntries]);
       setCompletedTaskIds([]);
       setShowRevisePanel(false);
       toast.success('MEP schedule generated!');
-    } catch (e) {
+    } catch {
       toast.error('Failed to generate schedule. Check your Gemini API key.');
     } finally {
       setLoading(false);
@@ -129,12 +127,9 @@ export default function DailyPlanning() {
       const result = await generateCleaningSchedule(postServiceTasks, settings.service_end_time, settings.closing_time, settings.staff_count);
       setCleaningSchedule(result.schedule || []);
       setCleaningFeasibilityWarning(result.feasibility_warning || null);
-      if (result.feasibility_warning) {
-        toast.warning(result.feasibility_warning);
-      } else {
-        toast.success('Cleaning schedule generated!');
-      }
-    } catch (e) {
+      if (result.feasibility_warning) toast.warning(result.feasibility_warning);
+      else toast.success('Cleaning schedule generated!');
+    } catch {
       toast.error('Failed to generate cleaning schedule.');
     } finally {
       setLoadingCleaning(false);
@@ -155,7 +150,7 @@ export default function DailyPlanning() {
       setSchedule([...revisedWithIds, ...cleaningItems]);
       setShowRevisePanel(false);
       toast.success('Schedule revised!');
-    } catch (e) {
+    } catch {
       toast.error('Failed to revise schedule.');
     } finally {
       setRevising(false);
@@ -163,14 +158,23 @@ export default function DailyPlanning() {
   }
 
   async function savePreset() {
-    if (!presetName.trim()) return toast.error('Enter a preset name');
+    if (!presetName.trim()) return toast.error('Enter a plan name');
     setSavingPreset(true);
     const existing = await db.entities.DailyPlan.filter({ plan_date: planDate });
     const payload = { plan_date: planDate, preset_name: presetName, dishes: selectedDishes, schedule, cleaning_schedule: cleaningSchedule, selected_cleaning_ids: selectedCleaningIds };
     if (existing.length > 0) { await db.entities.DailyPlan.update(existing[0].id, payload); }
     else { await db.entities.DailyPlan.create(payload); }
+
+    // Save to Files
+    await db.entities.SavedFile.create({
+      title: `Daily Plan — ${planDate}${presetName ? ` (${presetName})` : ''}`,
+      type: 'daily',
+      content: { planDate, presetName, dishes: selectedDishes, schedule, cleaningSchedule },
+      file_date: planDate,
+    });
+
     setSavingPreset(false);
-    toast.success('Plan saved!');
+    toast.success('Plan saved to Files!');
   }
 
   const prepTasks = schedule.filter(t => !t.during_service);
@@ -240,12 +244,16 @@ export default function DailyPlanning() {
             {selectedDishes.map(dish => {
               const label = labels.find(l => l.id === dish.label_id);
               return (
-                <div key={dish.recipe_id} className="flex items-center gap-3 bg-accent/40 rounded-lg px-3 py-2">
+                <div key={dish.recipe_id} className="flex items-center gap-2 bg-accent/40 rounded-lg px-3 py-2 flex-wrap">
                   {label && <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: label.color }} title={label.name} />}
-                  <span className="flex-1 text-sm font-medium">{dish.recipe_name}</span>
+                  <span className="flex-1 text-sm font-medium min-w-[120px]">{dish.recipe_name}</span>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs text-muted-foreground">Portions:</span>
                     <Input type="number" value={dish.portions} onChange={e => updatePortions(dish.recipe_id, e.target.value)} className="w-16 h-7 text-sm" min={1} />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground">Ready by:</span>
+                    <Input type="time" value={dish.deadline_time || ''} onChange={e => updateDeadline(dish.recipe_id, e.target.value)} className="w-28 h-7 text-sm" />
                   </div>
                   <button onClick={() => removeDish(dish.recipe_id)} className="text-muted-foreground hover:text-destructive"><X className="w-4 h-4" /></button>
                 </div>
@@ -259,13 +267,12 @@ export default function DailyPlanning() {
         </Button>
       </div>
 
-      {/* Cleaning Tasks Selection */}
+      {/* Cleaning Tasks */}
       <div className="bg-card border border-border rounded-xl p-4 mb-5 print:hidden">
         <button className="flex items-center justify-between w-full" onClick={() => setShowCleaningPanel(p => !p)}>
           <h2 className="font-semibold text-sm">Cleaning Tasks for Today</h2>
           {showCleaningPanel ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
         </button>
-
         {showCleaningPanel && (
           <div className="mt-4 space-y-4">
             {mepCleaningTasks.length > 0 && (
@@ -282,7 +289,6 @@ export default function DailyPlanning() {
                 </div>
               </div>
             )}
-
             {postServiceCleaningTasks.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">After Service</p>
@@ -297,20 +303,15 @@ export default function DailyPlanning() {
                 </div>
               </div>
             )}
-
             {allCleaningTasks.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-3">No cleaning tasks configured. Add them in the Cleaning Tasks page.</p>
+              <p className="text-sm text-muted-foreground text-center py-3">No cleaning tasks configured.</p>
             )}
-
             <Button onClick={handleGenerateCleaning} disabled={loadingCleaning} variant="outline" className="w-full gap-2">
               {loadingCleaning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
               Generate AI Cleaning Schedule
             </Button>
-
             {cleaningFeasibilityWarning && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300">
-                ⚠️ {cleaningFeasibilityWarning}
-              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">⚠️ {cleaningFeasibilityWarning}</div>
             )}
           </div>
         )}
@@ -327,13 +328,10 @@ export default function DailyPlanning() {
             completedTaskIds={completedTaskIds}
             onToggleComplete={toggleTaskComplete}
           />
-
           {showRevisePanel && (
-            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4 dark:bg-blue-950/20 dark:border-blue-800">
-              <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-1">
-                {completedTaskIds.length} task{completedTaskIds.length !== 1 ? 's' : ''} marked as done
-              </p>
-              <p className="text-xs text-blue-600 dark:text-blue-400 mb-3">AI can revise the remaining schedule based on what's already completed.</p>
+            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <p className="text-sm font-medium text-blue-800 mb-1">{completedTaskIds.length} task{completedTaskIds.length !== 1 ? 's' : ''} marked as done</p>
+              <p className="text-xs text-blue-600 mb-3">AI can revise the remaining schedule based on what's completed.</p>
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleRevise} disabled={revising} className="gap-2">
                   {revising ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -352,19 +350,17 @@ export default function DailyPlanning() {
           <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
             <Clock className="w-4 h-4 text-blue-500" />
             Post-Service Cleaning Schedule
-            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full dark:bg-blue-900/50 dark:text-blue-300">{cleaningSchedule.length} tasks</span>
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{cleaningSchedule.length} tasks</span>
           </h3>
           <div className="space-y-2">
             {cleaningSchedule.map((task, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-lg border border-blue-100 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900 print:break-inside-avoid">
+              <div key={i} className="flex items-start gap-3 p-3 rounded-lg border border-blue-100 bg-blue-50/50">
                 <div className="text-xs font-mono font-semibold text-muted-foreground w-24 shrink-0 pt-0.5">{task.start_time} – {task.end_time}</div>
                 <div className="flex-1">
                   <p className="text-sm font-medium">{task.task}</p>
                   {task.notes && <p className="text-xs text-muted-foreground mt-0.5">{task.notes}</p>}
                 </div>
-                {task.staff_needed > 0 && (
-                  <span className="text-xs text-muted-foreground">{task.staff_needed} staff</span>
-                )}
+                {task.staff_needed > 0 && <span className="text-xs text-muted-foreground">{task.staff_needed} staff</span>}
               </div>
             ))}
           </div>
@@ -377,7 +373,7 @@ export default function DailyPlanning() {
           <Input placeholder="Plan name (e.g. Friday Dinner Service)" value={presetName} onChange={e => setPresetName(e.target.value)} className="flex-1" />
           <Button onClick={savePreset} disabled={savingPreset} variant="outline" className="gap-1.5">
             {savingPreset ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Save Plan
+            Save to Files
           </Button>
         </div>
       )}

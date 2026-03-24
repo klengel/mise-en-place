@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { BookOpen, CalendarDays, Calendar, Sparkles, Settings, ChefHat, LogOut } from 'lucide-react';
+import { BookOpen, CalendarDays, Calendar, Sparkles, Settings, ChefHat, LogOut, ClipboardList, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -8,6 +8,8 @@ const navItems = [
   { to: '/daily', icon: CalendarDays, label: 'Daily Planning' },
   { to: '/weekly', icon: Calendar, label: 'Weekly Planning' },
   { to: '/cleaning', icon: Sparkles, label: 'Cleaning Tasks' },
+  { to: '/haccp', icon: ClipboardList, label: 'HACCP' },
+  { to: '/files', icon: FolderOpen, label: 'Files' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
@@ -27,7 +29,7 @@ export default function Layout() {
             <p className="text-xs text-muted-foreground">AI Kitchen</p>
           </div>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
@@ -68,14 +70,14 @@ export default function Layout() {
       </aside>
 
       {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex justify-around px-2 py-2">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex justify-around px-1 py-2 overflow-x-auto">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              cn('flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-xs',
+              cn('flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-xs shrink-0',
                 isActive ? 'text-primary' : 'text-muted-foreground'
               )
             }
@@ -86,7 +88,7 @@ export default function Layout() {
         ))}
         <button
           onClick={signOut}
-          className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted-foreground"
+          className="flex flex-col items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted-foreground shrink-0"
         >
           <LogOut className="w-5 h-5" />
           <span className="hidden sm:block">Logout</span>
