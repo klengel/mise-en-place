@@ -111,3 +111,33 @@ Revise and optimize the schedule for the remaining tasks. Return only a JSON arr
 ]`;
   return callGemini(prompt);
 }
+
+export async function generateWeeklySchedule(days, settings) {
+  const dayList = Object.entries(days)
+    .filter(([, dishes]) => dishes && dishes.length > 0)
+    .map(([day, dishes]) => {
+      const dishList = dishes.map(d => {
+        const deadline = d.deadline_time ? ` [ready by ${d.deadline_time}]` : '';
+        return `  - ${d.recipe_name} x${d.portions} portions${deadline}`;
+      }).join('\n');
+      return `${day.toUpperCase()}:\n${dishList}`;
+    }).join('\n\n');
+
+  const prompt = `You are a professional kitchen planner. Generate a full weekly mise en place schedule.
+Kitchen settings:
+- Staff: ${settings.staff_count}
+- Prep start each day: ${settings.prep_start_time}
+- Service start each day: ${settings.service_start_time}
+
+Weekly dishes:
+${dayList}
+
+Return only a JSON object where keys are day names (mon, tue, etc.) and values are arrays of schedule tasks:
+{
+  "mon": [{ "task": "<string>", "dish": "<string>", "start_time": "<HH:MM>", "end_time": "<HH:MM>", "staff_needed": <number>, "during_service": <boolean>, "notes": "<string>" }],
+  "tue": [...],
+  ...
+}
+Only include days that have dishes. Respect any deadline times marked [ready by HH:MM].`;
+  return callGemini(prompt);
+}
