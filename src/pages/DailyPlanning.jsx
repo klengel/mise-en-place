@@ -76,7 +76,17 @@ export default function DailyPlanning() {
   function addDish(recipe) {
     setSelectedDishes(prev => {
       if (prev.find(d => d.recipe_id === recipe.id)) return prev;
-      return [...prev, { recipe_id: recipe.id, recipe_name: recipe.name, portions: 10, steps: recipe.steps, ingredients: recipe.ingredients, label_id: recipe.label_id, deadline_time: '' }];
+      const label = labels.find(l => l.id === recipe.label_id);
+return [...prev, {
+  recipe_id: recipe.id,
+  recipe_name: recipe.name,
+  portions: 10,
+  steps: recipe.steps,
+  ingredients: recipe.ingredients,
+  label_id: recipe.label_id,
+  label_color: label?.color || null,   // ← new
+  deadline_time: '',
+}];
     });
     setShowRecipeSelector(false);
   }
@@ -158,6 +168,30 @@ export default function DailyPlanning() {
   }
 
 async function savePreset() {
+  if (!presetName.trim()) return toast.error('Enter a plan name');
+  setSavingPreset(true);
+  try {
+    const existing = await db.entities.DailyPlan.filter({ plan_date: planDate });
+    const payload = {
+      plan_date: planDate,
+      preset_name: presetName,
+      dishes: selectedDishes,
+      schedule,
+      cleaning_schedule: cleaningSchedule,
+      selected_cleaning_ids: selectedCleaningIds,
+    };
+    if (existing.length > 0) {
+      await db.entities.DailyPlan.update(existing[0].id, payload);
+    } else {
+      await db.entities.DailyPlan.create(payload);
+    }
+    toast.success('Plan saved to Files!');
+  } catch (e) {
+    toast.error('Failed to save plan.');
+  } finally {
+    setSavingPreset(false);
+  }
+}
   if (!presetName.trim()) return toast.error('Enter a plan name');
   setSavingPreset(true);
   try {
@@ -328,6 +362,7 @@ async function savePreset() {
           <ScheduleTimeline
             prepTasks={prepTasks}
             serviceTasks={serviceTasks}
+            dishes={selectedDishes}
             serviceToggles={serviceToggles}
             onToggleService={(i) => setServiceToggles(prev => ({ ...prev, [i]: !prev[i] }))}
             completedTaskIds={completedTaskIds}

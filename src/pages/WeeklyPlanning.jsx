@@ -2,7 +2,6 @@ import { db } from "@/lib/db";
 import { useState, useEffect } from 'react';
 import { Plus, Printer, Save, Loader2, X, ChevronLeft, ChevronRight, Wand2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from 'date-fns';
 import RecipeSelectorModal from '@/components/daily/RecipeSelectorModal';
@@ -15,6 +14,7 @@ export default function WeeklyPlanning() {
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [weekDays, setWeekDays] = useState({ mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] });
   const [recipes, setRecipes] = useState([]);
+  const [labels, setLabels] = useState([]);
   const [showSelector, setShowSelector] = useState(null);
   const [presetName, setPresetName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -27,6 +27,16 @@ export default function WeeklyPlanning() {
   const weekStartStr = format(weekStart, 'yyyy-MM-dd');
 
   useEffect(() => {
+  Promise.all([
+    db.entities.Recipe.list('-created_date', 100),
+    db.entities.KitchenSettings.filter({ is_default: true }),
+    db.entities.Label.list('name'),
+  ]).then(([r, s, l]) => {
+    setRecipes(r);
+    setLabels(l);
+    if (s.length > 0) setSettings(prev => ({ ...prev, ...s[0] }));
+  });
+}, []);
     db.entities.Recipe.list('-created_date', 100).then(setRecipes);
     db.entities.KitchenSettings.filter({ is_default: true }).then(s => {
       if (s.length > 0) setSettings(prev => ({ ...prev, ...s[0] }));
@@ -48,13 +58,21 @@ export default function WeeklyPlanning() {
     }
   }
 
-  function addDishToDay(day, recipe) {
-    setWeekDays(prev => ({
-      ...prev,
-      [day]: [...(prev[day] || []), { recipe_id: recipe.id, recipe_name: recipe.name, portions: 10, deadline_time: '' }]
-    }));
-    setShowSelector(null);
-  }
+ function addDishToDay(day, recipe) {
+  const label = labels.find(l => l.id === recipe.label_id);
+  setWeekDays(prev => ({
+    ...prev,
+    [day]: [...(prev[day] || []), {
+      recipe_id: recipe.id,
+      recipe_name: recipe.name,
+      portions: 10,
+      deadline_time: '',
+      label_id: recipe.label_id,
+      label_color: label?.color || null,   // ← new
+    }]
+  }));
+  setShowSelector(null);
+}
 
   function removeDishFromDay(day, recipeId) {
     setWeekDays(prev => ({ ...prev, [day]: (prev[day] || []).filter(d => d.recipe_id !== recipeId) }));
@@ -84,24 +102,25 @@ export default function WeeklyPlanning() {
 
   async function savePlan() {
     setSaving(true);
-    const payload = { week_start: weekStartStr, preset_name: presetName || undefined, days: weekDays, generated_schedule: generatedSchedule };
-    if (planId) {
-      await db.entities.WeeklyPlan.update(planId, payload);
-    } else {
-      const created = await db.entities.WeeklyPlan.create(payload);
-      setPlanId(created.id);
-    }
-
-    // Save to Files
-    await db.entities.WeeklyPlan.create({
-      title: `Weekly Plan — ${weekStartStr}${presetName ? ` (${presetName})` : ''}`,
-      type: 'weekly',
-      content: { weekStartStr, presetName, weekDays, generatedSchedule },
-      file_date: weekStartStr,
-    });
-
-    setSaving(false);
-    toast.success('Weekly plan saved to Files!');
+    try {
+      const payload = {
+        week_start: weekStartStr,
+        preset_name: presetName || undefined,
+        days: weekDays,
+        generated_schedule: generatedSchedule,
+      };
+      if (planId) {
+        await db.entities.WeeklyPlan.update(planId, payload);
+      } else {
+       const created = await db.entities.WeeklyPlan.create(payload);
+       setPlanId(created.id);
+      }
+      toast.success('Weekly plan saved to Files!');
+    } catch {
+     toast.error('Failed to save plan.');
+    } finally {
+     setSaving(false);
+   }
   }
 
   const totalDishes = Object.values(weekDays).reduce((acc, day) => acc + (day?.length || 0), 0);
@@ -161,6 +180,9 @@ export default function WeeklyPlanning() {
                 {dishes.map(dish => (
                   <div key={dish.recipe_id} className="bg-accent/50 rounded-md px-2 py-1 group">
                     <div className="flex items-center justify-between">
+                      {dish.label_color && (
+                        <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dish.label_color }} />
+                      )}
                       <span className="text-xs font-medium truncate flex-1">{dish.recipe_name}</span>
                       <button
                         onClick={() => removeDishFromDay(day, dish.recipe_id)}
