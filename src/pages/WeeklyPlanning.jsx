@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { useState, useEffect } from 'react';
 import { Plus, Printer, Save, Loader2, X, ChevronLeft, ChevronRight, Wand2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { format, startOfWeek, addDays, addWeeks, subWeeks } from 'date-fns';
 import RecipeSelectorModal from '@/components/daily/RecipeSelectorModal';
@@ -27,18 +28,13 @@ export default function WeeklyPlanning() {
   const weekStartStr = format(weekStart, 'yyyy-MM-dd');
 
   useEffect(() => {
-  Promise.all([
-    db.entities.Recipe.list('-created_date', 100),
-    db.entities.KitchenSettings.filter({ is_default: true }),
-    db.entities.Label.list('name'),
-  ]).then(([r, s, l]) => {
-    setRecipes(r);
-    setLabels(l);
-    if (s.length > 0) setSettings(prev => ({ ...prev, ...s[0] }));
-  });
-}, []);
-    db.entities.Recipe.list('-created_date', 100).then(setRecipes);
-    db.entities.KitchenSettings.filter({ is_default: true }).then(s => {
+    Promise.all([
+      db.entities.Recipe.list('-created_date', 100),
+      db.entities.KitchenSettings.filter({ is_default: true }),
+      db.entities.Label.list('name'),
+    ]).then(([r, s, l]) => {
+      setRecipes(r);
+      setLabels(l);
       if (s.length > 0) setSettings(prev => ({ ...prev, ...s[0] }));
     });
   }, []);
