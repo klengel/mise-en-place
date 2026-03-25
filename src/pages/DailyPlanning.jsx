@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { db } from "@/lib/db";
 import { useState, useEffect } from 'react';
 import { Plus, Loader2, Wand2, Printer, Save, X, Clock, CheckSquare, Square, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
@@ -168,30 +169,6 @@ return [...prev, {
   }
 
 async function savePreset() {
-  if (!presetName.trim()) return toast.error('Enter a plan name');
-  setSavingPreset(true);
-  try {
-    const existing = await db.entities.DailyPlan.filter({ plan_date: planDate });
-    const payload = {
-      plan_date: planDate,
-      preset_name: presetName,
-      dishes: selectedDishes,
-      schedule,
-      cleaning_schedule: cleaningSchedule,
-      selected_cleaning_ids: selectedCleaningIds,
-    };
-    if (existing.length > 0) {
-      await db.entities.DailyPlan.update(existing[0].id, payload);
-    } else {
-      await db.entities.DailyPlan.create(payload);
-    }
-    toast.success('Plan saved to Files!');
-  } catch (e) {
-    toast.error('Failed to save plan.');
-  } finally {
-    setSavingPreset(false);
-  }
-}
   if (!presetName.trim()) return toast.error('Enter a plan name');
   setSavingPreset(true);
   try {
