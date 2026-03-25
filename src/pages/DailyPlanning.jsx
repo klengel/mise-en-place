@@ -157,26 +157,31 @@ export default function DailyPlanning() {
     }
   }
 
-  async function savePreset() {
-    if (!presetName.trim()) return toast.error('Enter a plan name');
-    setSavingPreset(true);
+async function savePreset() {
+  if (!presetName.trim()) return toast.error('Enter a plan name');
+  setSavingPreset(true);
+  try {
     const existing = await db.entities.DailyPlan.filter({ plan_date: planDate });
-    const payload = { plan_date: planDate, preset_name: presetName, dishes: selectedDishes, schedule, cleaning_schedule: cleaningSchedule, selected_cleaning_ids: selectedCleaningIds };
-    if (existing.length > 0) { await db.entities.DailyPlan.update(existing[0].id, payload); }
-    else { await db.entities.DailyPlan.create(payload); }
-
-    // Save to Files
-    await db.entities.DailyPlan.create({
-      title: `Daily Plan — ${planDate}${presetName ? ` (${presetName})` : ''}`,
-      type: 'daily',
-      content: { planDate, presetName, dishes: selectedDishes, schedule, cleaningSchedule },
-      file_date: planDate,
-    });
-
-    setSavingPreset(false);
+    const payload = {
+      plan_date: planDate,
+      preset_name: presetName,
+      dishes: selectedDishes,
+      schedule,
+      cleaning_schedule: cleaningSchedule,
+      selected_cleaning_ids: selectedCleaningIds,
+    };
+    if (existing.length > 0) {
+      await db.entities.DailyPlan.update(existing[0].id, payload);
+    } else {
+      await db.entities.DailyPlan.create(payload);
+    }
     toast.success('Plan saved to Files!');
+  } catch (e) {
+    toast.error('Failed to save plan.');
+  } finally {
+    setSavingPreset(false);
   }
-
+}
   const prepTasks = schedule.filter(t => !t.during_service);
   const serviceTasks = schedule.filter(t => t.during_service);
   const mepCleaningTasks = allCleaningTasks.filter(t => t.during_mep);
