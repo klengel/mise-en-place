@@ -166,7 +166,7 @@ export default function DailyPlanning() {
     else { await db.entities.DailyPlan.create(payload); }
 
     // Save to Files
-    await db.entities.SavedFile.create({
+    await db.entities.DailyPlan.create({
       title: `Daily Plan — ${planDate}${presetName ? ` (${presetName})` : ''}`,
       type: 'daily',
       content: { planDate, presetName, dishes: selectedDishes, schedule, cleaningSchedule },

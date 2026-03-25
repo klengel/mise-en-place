@@ -93,7 +93,7 @@ export default function WeeklyPlanning() {
     }
 
     // Save to Files
-    await db.entities.SavedFile.create({
+    await db.entities.WeeklyPlan.create({
       title: `Weekly Plan — ${weekStartStr}${presetName ? ` (${presetName})` : ''}`,
       type: 'weekly',
       content: { weekStartStr, presetName, weekDays, generatedSchedule },

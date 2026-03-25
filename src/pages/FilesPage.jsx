@@ -127,13 +127,16 @@ export default function FilesPage() {
 
   async function loadFiles() {
     setLoading(true);
-    const all = await db.entities.SavedFile.list('-created_date');
+    const daily = await db.entities.DailyPlan.list('-created_date');
+const weekly = await db.entities.WeeklyPlan.list('-created_date');
+
+const all = [...daily, ...weekly];
     setFiles(all);
     setLoading(false);
   }
 
   async function deleteFile(id) {
-    await db.entities.SavedFile.delete(id);
+    await db.entities.DailyPlan.delete(id);
     setFiles(prev => prev.filter(f => f.id !== id));
     toast.success('File deleted');
   }
