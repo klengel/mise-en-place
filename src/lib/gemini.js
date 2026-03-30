@@ -142,26 +142,6 @@ Only include days that have dishes. Respect any deadline times marked [ready by 
   return callGemini(prompt);
 }
 
-function getGeminiUrl() {
-  const key = import.meta.env.VITE_GEMINI_API_KEY;
-  return `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
-}
-
-async function callGemini(prompt) {
-  const res = await fetch(getGeminiUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json' }
-    })
-  });
-  if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
-  const data = await res.json();
-  const text = data.candidates[0].content.parts[0].text;
-  return JSON.parse(text);
-}
-
 export async function parseOrderList(rawText, suppliers = [], knownIngredients = []) {
   const supplierNames = suppliers.map(s => s.name).join(', ') || 'unknown';
   const knownNames = knownIngredients.map(i => i.name).join(', ') || 'none';
