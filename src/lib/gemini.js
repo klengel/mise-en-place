@@ -141,3 +141,120 @@ Return only a JSON object where keys are day names (mon, tue, etc.) and values a
 Only include days that have dishes. Respect any deadline times marked [ready by HH:MM].`;
   return callGemini(prompt);
 }
+
+function getGeminiUrl() {
+  const key = import.meta.env.VITE_GEMINI_API_KEY;
+  return `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+}
+
+async function callGemini(prompt) {
+  const res = await fetch(getGeminiUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: 'application/json' }
+    })
+  });
+  if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
+  const data = await res.json();
+  const text = data.candidates[0].content.parts[0].text;
+  return JSON.parse(text);
+}
+
+export async function parseOrderList(rawText, suppliers = [], knownIngredients = []) {
+  const supplierNames = suppliers.map(s => s.name).join(', ') || 'unknown';
+  const knownNames = knownIngredients.map(i => i.name).join(', ') || 'none';
+
+  const prompt = `You are a professional kitchen manager parsing an order list or invoice.
+
+Raw order text:
+"""
+${rawText}
+"""
+
+Known suppliers in the system: ${supplierNames}
+Known ingredients in the system: ${knownNames}
+
+Extract all ordered items and return ONLY a JSON array. For each item:
+- Match ingredient names to known ingredients where possible (use exact name if match found)
+- Guess the supplier from context if identifiable
+- Parse amounts and units carefully (e.g. "5 kg", "2x1L", "10 stuks")
+- Estimate cost_per_unit if total and amount are both visible
+
+Return only JSON array:
+[
+  {
+    "ingredient_name": "<string>",
+    "matched_ingredient_name": "<string or null if no match>",
+    "amount": <number>,
+    "unit": "<kg|g|l|ml|units|stuks|box|crate>",
+    "cost_per_unit": <number or null>,
+    "total_cost": <number or null>,
+    "supplier_name": "<string or null>",
+    "category": "<dairy|meat|fish|produce|dry goods|beverages|cleaning|other>"
+  }
+]`;
+  return callGemini(prompt);
+}
+
+export async function linkIngredientsToDishes(ingredients, recipes) {
+  const recipeList = recipes.map(r => ({
+    name: r.name,
+    ingredients: (r.ingredients || []).map(i => i.name)
+  }));
+
+  const prompt = `You are a chef's assistant. For each ingredient below, identify which dishes (recipes) use it based on the recipe ingredient lists provided.
+
+Ingredients to link:
+${ingredients.map(i => `- ${i.ingredient_name}`).join('\n')}
+
+Recipes and their ingredients:
+${recipeList.map(r => `${r.name}: ${r.ingredients.join(', ')}`).join('\n')}
+
+Return ONLY a JSON object where each key is an ingredient name and the value is an array of recipe names that use it:
+{
+  "ingredient_name": ["Recipe A", "Recipe B"],
+  ...
+}`;
+  return callGemini(prompt);
+}
+
+export async function calculateAiMinStock(ingredient, salesHistory, recipes) {
+  // Find recipes that use this ingredient
+  const relevantRecipes = recipes.filter(r =>
+    (r.ingredients || []).some(i => i.name?.toLowerCase().includes(ingredient.name?.toLowerCase()))
+  );
+
+  if (relevantRecipes.length === 0 || salesHistory.length === 0) return null;
+
+  const recipeDetails = relevantRecipes.map(r => {
+    const ing = (r.ingredients || []).find(i => i.name?.toLowerCase().includes(ingredient.name?.toLowerCase()));
+    return `${r.name}: uses ${ing?.quantity || '?'} ${ing?.unit || ''} per ${r.base_portions || 1} portions`;
+  }).join('\n');
+
+  const salesSummary = salesHistory.slice(-30).map(s =>
+    s.entries?.map(e => `${e.recipe_name}: ${e.portions_sold} portions`).join(', ')
+  ).filter(Boolean).join('\n');
+
+  const prompt = `You are a kitchen inventory manager. Calculate the recommended minimum stock level for this ingredient.
+
+Ingredient: ${ingredient.name} (unit: ${ingredient.unit})
+Current min stock set by user: ${ingredient.min_stock} ${ingredient.unit}
+
+How it's used in recipes:
+${recipeDetails}
+
+Recent sales history (last 30 days):
+${salesSummary || 'No sales data yet'}
+
+Based on the sales patterns and recipe usage, what is the recommended minimum stock to always keep on hand (to cover ~1 week of average sales)?
+
+Return ONLY JSON:
+{
+  "suggested_min": <number>,
+  "reasoning": "<brief explanation>",
+  "avg_weekly_usage": <number>
+}`;
+  return callGemini(prompt);
+}

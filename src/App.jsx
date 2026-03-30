@@ -12,6 +12,9 @@ import Settings from './pages/Settings';
 import AuthPage from './pages/AuthPage';
 import HaccpPage from './pages/HaccpPage';
 import FilesPage from './pages/FilesPage';
+import InventoryPage from './pages/InventoryPage';
+import OrdersPage from './pages/OrdersPage';
+import SalesPage from './pages/SalesPage';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 
 function AppRoutes() {
@@ -35,6 +38,9 @@ function AppRoutes() {
         <Route path="/weekly" element={<WeeklyPlanning />} />
         <Route path="/cleaning" element={<CleaningTasks />} />
         <Route path="/haccp" element={<HaccpPage />} />
+        <Route path="/inventory" element={<InventoryPage />} />
+        <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/sales" element={<SalesPage />} />
         <Route path="/files" element={<FilesPage />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
